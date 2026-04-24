@@ -3,7 +3,7 @@ import axios from 'axios';
 import { supabase } from './supabase';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: "https://pegasusbackrny.onrender.com/api",
   timeout: 15000,
 });
 
