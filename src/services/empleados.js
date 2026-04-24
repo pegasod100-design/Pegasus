@@ -1,5 +1,7 @@
 import { supabase } from '../services/supabase';
 
+const BASE = import.meta.env.VITE_API_URL || "https://pegasusbackrny.onrender.com";
+
 //  GOOGLE
 export const getEmpleadoPorEmail = async (email) => {
   const { data } = await supabase
@@ -11,14 +13,16 @@ export const getEmpleadoPorEmail = async (email) => {
   return data;
 };
 
-//  LOGIN RFC — llama al backend para obtener JWT
+//  LOGIN RFC
 export const loginRFC = async (rfc, password) => {
   try {
-    const BASE = import.meta.env.VITE_API_URL || '/api';
-    const res = await fetch(`${BASE}/auth/login`, {
+    const res = await fetch(`${BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rfc_empleado: rfc.trim().toUpperCase(), clave: password }),
+      body: JSON.stringify({
+        rfc_empleado: rfc.trim().toUpperCase(),
+        clave: password
+      }),
     });
 
     const body = await res.json();
@@ -27,7 +31,6 @@ export const loginRFC = async (rfc, password) => {
       return { error: body.error || 'Credenciales incorrectas' };
     }
 
-    // Guardar JWT para que el interceptor de axios lo use en todas las peticiones
     localStorage.setItem('jwt_token', body.token);
 
     return { data: body.empleado };
