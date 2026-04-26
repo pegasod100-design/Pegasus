@@ -74,7 +74,7 @@ export default function Dashboard() {
     <>
       <style>{css}</style>
       <div>
-        <h1 className="dash-page-title">📊 Dashboard</h1>
+        <h1 className="dash-page-title">📊 Centro de Control</h1>
 
         <div className="dash-kpi-grid">
           {cards.map(c => (

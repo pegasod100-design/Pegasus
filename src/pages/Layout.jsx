@@ -164,7 +164,7 @@ export default function Layout() {
   const NAV = [
     { to: '/',           icon: '🔍', label: 'Buscar Producto', visible: true },
     { to: '/pos',        icon: '🛒', label: 'Punto de Venta',  visible: esAdmin || esCajero },
-    { to: '/dashboard',  icon: '📊', label: 'Dashboard',       visible: esAdmin },
+    { to: '/dashboard',  icon: '📊', label: 'Centro de Control',       visible: esAdmin },
     { to: '/inventario', icon: '📦', label: 'Inventario',      visible: esAdmin },
     { to: '/productos',  icon: '🏷️',  label: 'Productos',       visible: esAdmin },
     { to: '/facturas',   icon: '📋', label: 'Compras',         visible: esAdmin },
