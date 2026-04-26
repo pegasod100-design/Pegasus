@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getEmpleados, createEmpleado, updateEmpleado, getTiendas } from '../services/api';
+import api from '../services/api';
 
 const css = `
   .emp-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;}
@@ -19,7 +20,9 @@ const css = `
   .emp-info-box{width:100%;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1d4ed8;box-sizing:border-box;}
   .btn-reenviar{padding:8px 14px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:7px;color:#15803d;font-size:12px;font-weight:700;cursor:pointer;width:100%;}
   .btn-reenviar:hover{background:#dcfce7;}
-  .btn-reenviar:disabled{opacity:0.6;cursor:not-allowed;}
+  /* Confirm delete overlay */
+  .del-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:400;padding:16px;}
+  .del-card{background:#fff;border-radius:14px;padding:28px;max-width:360px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.2);display:flex;flex-direction:column;gap:14px;}
 `;
 
 const EMPTY = { rfc_empleado:'', nombre:'', apellido_paterno:'', apellido_materno:'', puesto:'', correo_electronico:'', id_tienda:'', activo:true };
@@ -31,11 +34,13 @@ export default function Empleados() {
   const [empleados, setEmpleados] = useState([]);
   const [tiendas, setTiendas] = useState([]);
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState(null);       // null | 'nuevo' | 'editar'
   const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reenviar, setReenviar] = useState(false);
+  const [confirmarEliminar, setConfirmarEliminar] = useState(null); // empleado a eliminar
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = () => {
     setLoading(true);
@@ -56,17 +61,19 @@ export default function Empleados() {
       if (modal === 'nuevo') {
         const res = await createEmpleado(form);
         const emailMsg = res.data?.email_enviado
-          ? `\n📧 Se envió un email a ${form.correo_electronico} con el enlace para establecer contraseña.`
-          : '\n⚠️ Sin correo registrado — el empleado no recibirá email.';
+          ? `\n📧 Email enviado a ${form.correo_electronico} con enlace para establecer contraseña.`
+          : '\n⚠️ Sin correo — el empleado no recibirá email.';
         alert(`✅ Empleado creado.${emailMsg}`);
       } else {
         const payload = { ...form, reenviar_link: reenviar };
         const res = await updateEmpleado(form.rfc_empleado, payload);
         if (reenviar) {
           const emailMsg = res.data?.email_enviado
-            ? `📧 Se reenvió el enlace a ${form.correo_electronico}.`
-            : '⚠️ No se pudo enviar el email (sin correo o error).';
+            ? `📧 Enlace reenviado a ${form.correo_electronico}.`
+            : '⚠️ No se pudo enviar (sin correo o error SMTP).';
           alert(`✅ Empleado actualizado.\n${emailMsg}`);
+        } else {
+          alert('✅ Empleado actualizado.');
         }
       }
       setModal(null);
@@ -74,6 +81,19 @@ export default function Empleados() {
     } catch (err) {
       alert(err.response?.data?.error || 'Error al guardar');
     } finally { setSaving(false); }
+  };
+
+  // Desactivar (soft delete) al empleado
+  const eliminarEmpleado = async () => {
+    if (!confirmarEliminar) return;
+    setEliminando(true);
+    try {
+      await updateEmpleado(confirmarEliminar.rfc_empleado, { activo: false });
+      setConfirmarEliminar(null);
+      cargar();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al eliminar empleado');
+    } finally { setEliminando(false); }
   };
 
   const filtrados = empleados.filter(e =>
@@ -105,16 +125,22 @@ export default function Empleados() {
                 <div style={{ fontWeight:700, fontSize:13, color:'#1e293b' }}>{emp.nombre} {emp.apellido_paterno}</div>
                 <div style={{ background:'#dbeafe', color:'#2563eb', padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700 }}>{emp.puesto}</div>
                 <div style={{ fontSize:11, fontFamily:'monospace', color:'#64748b' }}>{emp.rfc_empleado}</div>
-                {emp.correo_electronico && <div style={{ fontSize:11, color:'#94a3b8' }}>{emp.correo_electronico}</div>}
+                {emp.correo_electronico && <div style={{ fontSize:11, color:'#94a3b8', wordBreak:'break-all' }}>{emp.correo_electronico}</div>}
                 <div style={{ fontSize:12, color:'#475569' }}>📍 {emp.tiendas?.nombre_tienda || 'Sin tienda'}</div>
-                <button style={{ marginTop:4, padding:'6px 16px', borderRadius:7, background:'#f1f5f9', border:'1.5px solid #e2e8f0', cursor:'pointer', fontWeight:600, fontSize:12 }}
-                  onClick={() => abrir(emp)}>Editar</button>
+                {/* Botones acción */}
+                <div style={{ display:'flex', gap:6, marginTop:4, width:'100%' }}>
+                  <button style={{ flex:1, padding:'6px 10px', borderRadius:7, background:'#f1f5f9', border:'1.5px solid #e2e8f0', cursor:'pointer', fontWeight:600, fontSize:12 }}
+                    onClick={() => abrir(emp)}>✏️ Editar</button>
+                  <button style={{ padding:'6px 10px', borderRadius:7, background:'#fee2e2', border:'1.5px solid #fecaca', cursor:'pointer', fontWeight:600, fontSize:12, color:'#dc2626' }}
+                    onClick={() => setConfirmarEliminar(emp)}>🗑️</button>
+                </div>
               </div>
             ))}
             {filtrados.length === 0 && <p style={{ color:'#94a3b8', gridColumn:'1/-1', textAlign:'center', padding:24 }}>Sin resultados.</p>}
           </div>
         )}
 
+        {/* ── MODAL EDITAR / CREAR ── */}
         {modal && (
           <div className="emp-overlay" onClick={() => setModal(null)}>
             <div className="emp-modal" onClick={e => e.stopPropagation()}>
@@ -157,24 +183,22 @@ export default function Empleados() {
                 </div>
               </div>
 
-              {/* Info sobre contraseñas */}
               {modal === 'nuevo' && (
                 <div className="emp-info-box" style={{ marginTop:14 }}>
-                  📧 Al guardar, se enviará automáticamente un email al empleado con un <strong>enlace para establecer su contraseña</strong>. El empleado NO recibirá la contraseña directamente.
+                  📧 Al guardar, se enviará al correo del empleado un <strong>enlace para que establezca su propia contraseña</strong>. No se envía la contraseña en texto.
                 </div>
               )}
 
               {modal === 'editar' && (
-                <div style={{ marginTop:14, display:'flex', flexDirection:'column', gap:8 }}>
-                  <button
-                    className="btn-reenviar"
+                <div style={{ marginTop:14, display:'flex', flexDirection:'column', gap:6 }}>
+                  <button className="btn-reenviar"
                     onClick={() => setReenviar(v => !v)}
                     style={{ background: reenviar ? '#dcfce7' : '#f0fdf4', borderColor: reenviar ? '#4ade80' : '#86efac' }}>
-                    {reenviar ? '✅ Se reenviará el link al guardar' : '📧 Reenviar link de establecer contraseña'}
+                    {reenviar ? '✅ Se reenviará el enlace al guardar' : '📧 Reenviar enlace para establecer contraseña'}
                   </button>
                   {reenviar && (
                     <p className="emp-hint" style={{ color:'#15803d' }}>
-                      Al guardar, se enviará un nuevo enlace (válido 24 h) al correo del empleado para que establezca su contraseña.
+                      Al guardar, el empleado recibirá un nuevo enlace (válido 24 h) para establecer/cambiar su contraseña.
                     </p>
                   )}
                 </div>
@@ -186,6 +210,39 @@ export default function Empleados() {
                 <button style={{ flex:2, padding:10, borderRadius:8, background:'#2563eb', color:'#fff', border:'none', cursor:'pointer', fontWeight:700, opacity: saving ? 0.7 : 1 }}
                   onClick={guardar} disabled={saving}>
                   {saving ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL CONFIRMAR ELIMINAR ── */}
+        {confirmarEliminar && (
+          <div className="del-overlay" onClick={() => setConfirmarEliminar(null)}>
+            <div className="del-card" onClick={e => e.stopPropagation()}>
+              <div style={{ textAlign:'center' }}>
+                <span style={{ fontSize:44 }}>🗑️</span>
+                <h3 style={{ margin:'8px 0 4px', fontSize:18, fontWeight:800, color:'#1e293b' }}>
+                  ¿Eliminar empleado?
+                </h3>
+                <p style={{ margin:0, fontSize:14, color:'#64748b' }}>
+                  <strong>{confirmarEliminar.nombre} {confirmarEliminar.apellido_paterno}</strong>
+                </p>
+                <p style={{ margin:'4px 0 0', fontSize:12, fontFamily:'monospace', color:'#94a3b8' }}>
+                  {confirmarEliminar.rfc_empleado}
+                </p>
+              </div>
+              <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:8, padding:'10px 14px' }}>
+                <p style={{ margin:0, fontSize:12, color:'#dc2626' }}>
+                  El empleado quedará <strong>inactivo</strong> y no podrá iniciar sesión. Sus registros históricos se conservan.
+                </p>
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button style={{ flex:1, padding:'11px', borderRadius:8, border:'1.5px solid #e2e8f0', background:'#f8fafc', cursor:'pointer', fontWeight:600, fontSize:14 }}
+                  onClick={() => setConfirmarEliminar(null)}>Cancelar</button>
+                <button style={{ flex:1, padding:'11px', borderRadius:8, background:'#dc2626', color:'#fff', border:'none', cursor:'pointer', fontWeight:700, fontSize:14, opacity: eliminando ? 0.7 : 1 }}
+                  onClick={eliminarEmpleado} disabled={eliminando}>
+                  {eliminando ? 'Eliminando...' : '🗑️ Sí, eliminar'}
                 </button>
               </div>
             </div>
