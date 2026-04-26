@@ -399,7 +399,7 @@ export default function Reportes() {
       getVentasPorDia(params),
       getProductosMasVendidos({ ...params, limit:10 }),
       getVentasPorTienda(params),
-      api.get('/api/reportes/detalle-productos', { params }),
+      api.get('/reportes/detalle-productos', { params }),
     ]).then(([vd, tp, vt, det]) => {
       setVentasDia(vd.data.map(r => ({
         fecha: r.fecha_venta?.slice(5),
@@ -433,7 +433,7 @@ export default function Reportes() {
     try {
       const detalle = detalleCompleto.length
         ? detalleCompleto
-        : (await api.get('/api/reportes/detalle-productos', { params:{ fecha_inicio:ini, fecha_fin:fin, ...(idTienda?{id_tienda:idTienda}:{}) } })).data;
+        : (await api.get('/reportes/detalle-productos', { params:{ fecha_inicio:ini, fecha_fin:fin, ...(idTienda?{id_tienda:idTienda}:{}) } })).data;
 
       if (tipo === 'productos')   generarPDFProductos(detalle, periodoLabel, tiendaNombreFiltro);
       if (tipo === 'por_tienda')  generarPDFPorTienda(detalle, periodoLabel);
